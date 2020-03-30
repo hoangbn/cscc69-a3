@@ -35,7 +35,18 @@ void print_inode(struct ext2_inode *inode) {
 // get inode at given path(can be a directory or a file), and corresponding
 // dir_entry value to dir_entry parameter. If not valid return NULL
 struct ext2_inode *path_walk(char *path, struct ext2_dir_entry_2 **dir_entry) {
-  // return NULL if path doesn't start with /
+  char *last_section_name;
+  struct ext2_inode *second_last = path_walk_second_last(path, &last_section_name);
+  if (second_last == NULL) return NULL;
+  struct ext2_dir_entry_2 *last = get_next_dir_entry(second_last, last_section_name);
+  if (dir_entry != NULL) *dir_entry = last;
+  return last == NULL ? NULL : get_inode(last->inode);
+}
+
+// get inode of a second to last section on path (must be a directory since
+// there is also the last section). Also assigns name of last section.
+// Returns NULL if path not valid
+struct ext2_inode *path_walk_second_last(char *path, char** last_section_name) {
   if (path[0] != '/')
     return NULL;
   // divide path into sections, store in array
@@ -52,9 +63,9 @@ struct ext2_inode *path_walk(char *path, struct ext2_dir_entry_2 **dir_entry) {
     if (cur == NULL)
       return NULL;
   }
-  struct ext2_dir_entry_2 *last = get_next_dir_entry(cur, path_array[sections_count - 1]);
-  *dir_entry = last;
-  return last == NULL ? NULL : get_inode(last->inode);
+  if (last_section_name != NULL) 
+    *last_section_name = path_array[sections_count - 1];
+  return cur;
 }
 
 // provides sections array of the path (not including root), and count of
