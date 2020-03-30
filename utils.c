@@ -17,7 +17,7 @@ void print_inode(struct ext2_inode *inode) {
     printf("Path Invalid\n");
     return;
   }
-  printf("[current] type: %c size: %d links: %d blocks: %d\n", get_type(inode),
+  printf("[current] type: %c size: %d links: %d blocks: %d\n", get_type_inode(inode),
          inode->i_size, inode->i_links_count, inode->i_blocks);
   // Now to print all the blocks for the inode
   printf("[current] Blocks: ");
@@ -32,9 +32,9 @@ void print_inode(struct ext2_inode *inode) {
   printf("\n");
 }
 
-// get inode at given path(can be a directory or a file) if valid, else returns
-// NULL
-struct ext2_inode *path_walk(char *path) {
+// get inode at given path(can be a directory or a file), and corresponding
+// dir_entry value to dir_entry parameter. If not valid return NULL
+struct ext2_inode *path_walk(char *path, struct ext2_dir_entry_2 **dir_entry) {
   // return NULL if path doesn't start with /
   if (path[0] != '/')
     return NULL;
@@ -50,9 +50,11 @@ struct ext2_inode *path_walk(char *path) {
   for (int i = 0; i < sections_count - 1; i++) {
     cur = get_next_dir(cur, path_array[i]);
     if (cur == NULL)
-      return cur;
+      return NULL;
   }
-  return get_next_inode(cur, path_array[sections_count - 1]);
+  struct ext2_dir_entry_2 *last = get_next_dir_entry(cur, path_array[sections_count - 1]);
+  *dir_entry = last;
+  return last == NULL ? NULL : get_inode(last->inode);
 }
 
 // provides sections array of the path (not including root), and count of
@@ -79,7 +81,7 @@ struct ext2_inode *get_root_dir() {
 struct ext2_inode *get_next_dir(struct ext2_inode *cur_dir, char *dir_name) {
   // get inode with given name, check if it's a directory, return accordingly
   struct ext2_inode *next_inode = get_next_inode(cur_dir, dir_name);
-  if (get_type(next_inode) != 'd')
+  if (next_inode == NULL || get_type_inode(next_inode) != 'd')
     return NULL;
   return next_inode;
 }
@@ -87,23 +89,26 @@ struct ext2_inode *get_next_dir(struct ext2_inode *cur_dir, char *dir_name) {
 // get next inode from given name and inode of it's parent directory, return
 // null if doesn't exist
 struct ext2_inode *get_next_inode(struct ext2_inode *cur_dir, char *name) {
+  struct ext2_dir_entry_2 *dir = get_next_dir_entry(cur_dir, name);
+  return dir == NULL ? NULL : get_inode(dir->inode);
+}
+
+// get directory entry given name and it's parent directory inode
+struct ext2_dir_entry_2 *get_next_dir_entry(struct ext2_inode *cur_dir, char *name) {
   int name_len = strlen(name);
   // Get the array of blocks from inode
   unsigned int *arr = cur_dir->i_block;
   while (*arr != 0) {
-    // Get the block number
-    int blocknum = *arr;
     // get starting position in the block;
-    unsigned long pos = (unsigned long)disk + blocknum * EXT2_BLOCK_SIZE;
+    unsigned long pos = (unsigned long)disk + *arr * EXT2_BLOCK_SIZE;
     struct ext2_dir_entry_2 *dir = (struct ext2_dir_entry_2 *)pos;
     // loop till the end of the block
     do {
       // if given name match current inode name, return current inode
-      if (name_len == dir->name_len &&
-          strncmp(dir->name, name, dir->name_len) == 0)
-        return get_inode(dir->inode);
+      if (name_len == dir->name_len && strncmp(dir->name, name, dir->name_len) == 0)
+        return dir;
       // advance to the next inode
-      pos += dir->rec_len;
+      pos += dir->rec_len;  
       dir = (struct ext2_dir_entry_2 *)pos;
     } while (pos % EXT2_BLOCK_SIZE != 0);
     // advance to the next block in array
@@ -112,9 +117,15 @@ struct ext2_inode *get_next_inode(struct ext2_inode *cur_dir, char *name) {
   return NULL;
 }
 
-// get type if inode
-char get_type(struct ext2_inode *inode) {
+// get type of inode
+char get_type_inode(struct ext2_inode *inode) {
   return S_ISDIR(inode->i_mode) ? 'd' : (S_ISREG(inode->i_mode) ? 'f' : 's');
+}
+
+// get type of dir entry
+char get_type_dir_entry(struct ext2_dir_entry_2 *dir) {
+  return dir->file_type == EXT2_FT_REG_FILE ? 'f' : 
+                        (dir->file_type == EXT2_FT_DIR ? 'd' : 's');
 }
 
 // get inode from inode number
