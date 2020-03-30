@@ -12,10 +12,8 @@ int main(int argc, char **argv) {
   printf("%s\n", argv[0]);
   printf("%s\n", argv[1]);
   printf("%s\n", argv[2]);
-  if (loaddisk(argv[1]) != 0)
-    exit(1);
+  loaddisk(argv[1]);
   struct ext2_inode *dir_to_ls = path_walk(argv[2]);
   print_inode(dir_to_ls);
-
   return 0;
 }
