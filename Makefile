@@ -6,5 +6,5 @@ ext2_ls: ext2_ls.o diskload.o utils.o
 %.o: %.c diskload.h utils.h
 	gcc -Wall -g -c $<
 
-clean : 
+clean :
 	rm -f *.o

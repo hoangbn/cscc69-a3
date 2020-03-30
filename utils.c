@@ -1,15 +1,15 @@
-#include <stdio.h>
-#include <unistd.h>
-#include <stdlib.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <sys/mman.h>
-#include <string.h>
-#include <errno.h>
-#include "ext2.h"
-#include "diskload.h"
 #include "utils.h"
+#include "diskload.h"
+#include "ext2.h"
+#include <errno.h>
+#include <fcntl.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 // debugging helper
 void print_inode(struct ext2_inode *inode) {
@@ -24,40 +24,44 @@ void print_inode(struct ext2_inode *inode) {
   // Get the array of blocks from inode
   unsigned int *arr = inode->i_block;
   // Loop through and print all value till a 0 is seen in the array
-  while (1)
-  {
-    if (*arr == 0) break;
+  while (1) {
+    if (*arr == 0)
+      break;
     printf("%d ", *arr++);
   }
   printf("\n");
 }
 
-// get inode at given path(can be a directory or a file) if valid, else returns NULL
+// get inode at given path(can be a directory or a file) if valid, else returns
+// NULL
 struct ext2_inode *path_walk(char *path) {
   // return NULL if path doesn't start with /
-  if (path[0] != '/') return NULL;
+  if (path[0] != '/')
+    return NULL;
   // divide path into sections, store in array
   int sections_count;
   char *path_array[100];
   path_as_array(path, path_array, &sections_count);
   // get the root directory
   struct ext2_inode *cur = get_root_dir();
-  if (sections_count == 0) return cur;
+  if (sections_count == 0)
+    return cur;
   // walk through path until last section
   for (int i = 0; i < sections_count - 1; i++) {
     cur = get_next_dir(cur, path_array[i]);
-    if (cur == NULL) return cur;
+    if (cur == NULL)
+      return cur;
   }
   return get_next_inode(cur, path_array[sections_count - 1]);
 }
 
-// provides sections array of the path (not including root), and count of sections
+// provides sections array of the path (not including root), and count of
+// sections
 void path_as_array(char *path, char **path_array, int *sections_count) {
   int count = 0;
   char *modifiablePath = strdup(path);
   char *p = strtok(modifiablePath, "/");
-  while (p != NULL)
-  {
+  while (p != NULL) {
     path_array[count] = p;
     count++;
     p = strtok(NULL, "/");
@@ -70,7 +74,8 @@ struct ext2_inode *get_root_dir() {
   return get_inode(2);
 }
 
-// get next directory given it's name and inode of it's parent directory, return null if doesn't exist
+// get next directory given it's name and inode of it's parent directory, return
+// null if doesn't exist
 struct ext2_inode *get_next_dir(struct ext2_inode *cur_dir, char *dir_name) {
   // get inode with given name, check if it's a directory, return accordingly
   struct ext2_inode *next_inode = get_next_inode(cur_dir, dir_name);
@@ -79,7 +84,8 @@ struct ext2_inode *get_next_dir(struct ext2_inode *cur_dir, char *dir_name) {
   return next_inode;
 }
 
-// get next inode from given name and inode of it's parent directory, return null if doesn't exist
+// get next inode from given name and inode of it's parent directory, return
+// null if doesn't exist
 struct ext2_inode *get_next_inode(struct ext2_inode *cur_dir, char *name) {
   int name_len = strlen(name);
   // Get the array of blocks from inode
@@ -93,7 +99,8 @@ struct ext2_inode *get_next_inode(struct ext2_inode *cur_dir, char *name) {
     // loop till the end of the block
     do {
       // if given name match current inode name, return current inode
-      if (name_len == dir->name_len && strncmp(dir->name, name, dir->name_len) == 0) 
+      if (name_len == dir->name_len &&
+          strncmp(dir->name, name, dir->name_len) == 0)
         return get_inode(dir->inode);
       // advance to the next inode
       pos += dir->rec_len;
@@ -112,5 +119,6 @@ char get_type(struct ext2_inode *inode) {
 
 // get inode from inode number
 struct ext2_inode *get_inode(int inodenum) {
-  return ((struct ext2_inode *)(disk + bgd->bg_inode_table * EXT2_BLOCK_SIZE)) + inodenum - 1;
+  return ((struct ext2_inode *)(disk + bgd->bg_inode_table * EXT2_BLOCK_SIZE)) +
+         inodenum - 1;
 }
