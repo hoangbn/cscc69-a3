@@ -1,6 +1,3 @@
-#include "utils.h"
-#include "diskload.h"
-#include "ext2.h"
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -10,6 +7,9 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include "ext2.h"
+#include "utils.h"
+#include "diskload.h"
 
 // debugging helper
 void print_inode(struct ext2_inode *inode) {
