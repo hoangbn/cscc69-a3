@@ -9,7 +9,7 @@
 #include "utils.h"
 
 // checks if given name is either . or .. (1 if true 0 if false)
-int isCurOrPrev (char* name, int name_len) {
+int is_cur_or_prev (char* name, int name_len) {
   return ((name_len == 1 && strncmp(".", name, 1) == 0)) || 
             ((name_len == 2 && strncmp("..", name, 2) == 0));
 }
@@ -34,7 +34,7 @@ int main(int argc, char **argv) {
   if (inode_to_ls == NULL) {
     printf("No such file or directory\n");
     return ENOENT;
-  } else if (get_type_inode(inode_to_ls) != 'd') {
+  } else if (get_type_inode(inode_to_ls) != EXT2_FT_DIR) {
     printf("%.*s\n", dir_entry_to_ls->name_len, dir_entry_to_ls->name);
   } else {
     // if it's a dir, get the array of blocks, and loop through all entries,
@@ -44,7 +44,7 @@ int main(int argc, char **argv) {
       unsigned long pos = (unsigned long)disk + *arr * EXT2_BLOCK_SIZE;
       struct ext2_dir_entry_2 *dir = (struct ext2_dir_entry_2 *)pos;
       do {
-        if (all_option || !isCurOrPrev(dir->name, dir->name_len)) {
+        if (all_option || !is_cur_or_prev(dir->name, dir->name_len)) {
           printf("%.*s\n", dir->name_len, dir->name);
         }
         pos += dir->rec_len;
