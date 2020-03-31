@@ -31,5 +31,8 @@ char *get_block_bitmap();
 char *get_inode_bitmap();
 unsigned int calculate_iblocks(unsigned int old_iblocks, int extra_bytes);
 
+// for cp 
+#define BLOCK_START(DISK, BLOCK_NUM) ((DISK) + (BLOCK_NUM) * EXT2_BLOCK_SIZE)
+#define NUM_DISK_BLKS(CURR, DELTA) (((CURR * 512) + (DELTA)) / 512)
 
 #endif

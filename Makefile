@@ -1,11 +1,14 @@
 COMPILE = gcc -Wall -g -o $@ $^
 
-all: ext2_ls ext2_mkdir
+all: ext2_ls ext2_mkdir ext2_cp
 	
 ext2_ls: ext2_ls.o diskload.o utils.o
 	$(COMPILE)
 
 ext2_mkdir: ext2_mkdir.o diskload.o utils.o
+	$(COMPILE)
+
+ext2_cp: ext2_cp.o diskload.o utils.o
 	$(COMPILE)
 
 %.o: %.c diskload.h utils.h
