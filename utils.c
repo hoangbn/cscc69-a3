@@ -171,10 +171,12 @@ struct ext2_dir_entry_2 *create_dir_entry(struct ext2_inode *parent_inode,
       // if there is enough space for new entry
       int free_len = dir->rec_len - cur_real_len;
       if (free_len >= needed_rec_len) {
-        // create new entry with new values and return it
+        // create new entry with new values
         pos += cur_real_len;
         struct ext2_dir_entry_2 *new_entry = (struct ext2_dir_entry_2 *)pos;
         init_entry_values(new_entry, entry_inode, free_len, name_len, file_type, name);
+        // change the current dir rec_len
+        dir->rec_len = cur_real_len;
         return new_entry;
       }
       // advance to the next inode
