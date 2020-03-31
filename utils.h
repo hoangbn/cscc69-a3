@@ -3,6 +3,7 @@
 
 // debuger helpers
 extern void print_inode(struct ext2_inode *inode);
+extern void print_disk_image();
 
 // utils
 extern struct ext2_dir_entry_2 *create_dir_entry(struct ext2_inode *parent_inode,
