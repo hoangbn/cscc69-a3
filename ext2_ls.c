@@ -34,7 +34,7 @@ int main(int argc, char **argv) {
   if (inode_to_ls == NULL) {
     printf("No such file or directory\n");
     return ENOENT;
-  } else if (get_type_inode(inode_to_ls) != 'd') {
+  } else if (get_type_inode(inode_to_ls) != EXT2_FT_DIR) {
     printf("%.*s\n", dir_entry_to_ls->name_len, dir_entry_to_ls->name);
   } else {
     // if it's a dir, get the array of blocks, and loop through all entries,

@@ -1,4 +1,5 @@
 #include <errno.h>
+#include <time.h> 
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -32,11 +33,76 @@ void print_inode(struct ext2_inode *inode) {
   printf("\n");
 }
 
+// attempts to create a new directory entry with given name and file type, sets inode
+// of new entry to given inode number. If given inode number is 0, allocates a new inode
+struct ext2_dir_entry_2 *create_dir_entry(struct ext2_inode *parent_inode,
+                       char* name, char file_type, unsigned int inodenum) {
+  // check if there already exists an entry with given name
+  if (get_next_dir_entry(parent_inode, name) != NULL) exit(EEXIST);
+  // get inode number to set for new entry
+  unsigned int entry_inode = inodenum == 0 ? allocate_inode(file_type) : inodenum;
+  int dir_entry_size = sizeof(struct ext2_dir_entry_2);
+  int name_len = strlen(name);
+  // get actual rec_len needed for new entry (rounded up to nearest multiple of 4)
+  int needed_rec_len = real_rec_len_round(dir_entry_size + name_len);
+  // start looping through blocks, computing actual size of directory entries
+  // in the blocks to see if new entry can fit in between
+  unsigned int *arr = parent_inode->i_block;
+  while (*arr != 0) {
+    // get starting position in the block;
+    unsigned long pos = (unsigned long)disk + *arr * EXT2_BLOCK_SIZE;
+    struct ext2_dir_entry_2 *dir = (struct ext2_dir_entry_2 *)pos;
+    // loop till the end of the block, checking if there is space for new entry
+    do {
+      // get real rec_len of current entry
+      int cur_real_len = real_rec_len_round(dir_entry_size + dir->name_len);
+      // if there is enough space for new entry
+      int free_len = dir->rec_len - cur_real_len;
+      if (free_len >= needed_rec_len) {
+        // create new entry with new values and return it
+        pos += cur_real_len;
+        struct ext2_dir_entry_2 *new_entry = (struct ext2_dir_entry_2 *)pos;
+        init_entry_values(new_entry, entry_inode, free_len, name_len, file_type, name);
+        return new_entry;
+      }
+      // advance to the next inode
+      pos += dir->rec_len;  
+      dir = (struct ext2_dir_entry_2 *)pos;
+    } while (pos % EXT2_BLOCK_SIZE != 0);
+    // advance to the next block in array
+    arr++;
+  }
+  // at this point, all blocks are full, we need to allocate a new block
+  // Note: by assignment description, we only need to handle single indirection for files
+  // and more than one block for directory (no need for single indirection for directories)
+  // so assuming here, *arr value < 12;
+  int blocknum = allocate_block();
+  // update inode after allocating
+  *arr = blocknum;
+  parent_inode->i_size = parent_inode->i_size + 1;
+  parent_inode->i_blocks = calculate_iblocks(parent_inode->i_blocks, EXT2_BLOCK_SIZE);
+  // get the block and create new entry (offset 0)
+  unsigned long new_block_pos = (unsigned long)disk + blocknum * EXT2_BLOCK_SIZE;
+  struct ext2_dir_entry_2 *new_entry = (struct ext2_dir_entry_2 *) new_block_pos;
+  init_entry_values(new_entry, entry_inode, EXT2_BLOCK_SIZE, name_len, file_type, name);
+  return new_entry;
+}
+
+// initialize directory entry values
+void init_entry_values(struct ext2_dir_entry_2 *entry, unsigned int inodenum,
+      unsigned short rec_len, unsigned char name_len, unsigned char file_type, char *name) {
+  entry->inode = inodenum;
+  entry->rec_len = rec_len;
+  entry->name_len = name_len;
+  entry->file_type= file_type;
+  strncpy(entry->name, name, name_len);
+}
+
 // get inode at given path(can be a directory or a file), and corresponding
 // dir_entry value to dir_entry parameter. If not valid return NULL
 struct ext2_inode *path_walk(char *path, struct ext2_dir_entry_2 **dir_entry) {
   char *last_section_name;
-  struct ext2_inode *second_last = path_walk_second_last(path, &last_section_name);
+  struct ext2_inode *second_last = path_walk_second_last(path, &last_section_name, NULL);
   if (second_last == NULL) return NULL;
   struct ext2_dir_entry_2 *last = get_next_dir_entry(second_last, last_section_name);
   if (dir_entry != NULL) *dir_entry = last;
@@ -46,7 +112,7 @@ struct ext2_inode *path_walk(char *path, struct ext2_dir_entry_2 **dir_entry) {
 // get inode of a second to last section on path (must be a directory since
 // there is also the last section). Also assigns name of last section.
 // Returns NULL if path not valid
-struct ext2_inode *path_walk_second_last(char *path, char** last_section_name) {
+struct ext2_inode *path_walk_second_last(char *path, char** last_section_name, int* inodenum) {
   if (path[0] != '/')
     return NULL;
   // divide path into sections, store in array
@@ -55,11 +121,14 @@ struct ext2_inode *path_walk_second_last(char *path, char** last_section_name) {
   path_as_array(path, path_array, &sections_count);
   // get the root directory
   struct ext2_inode *cur = get_root_dir();
-  if (sections_count == 0)
+  if (sections_count == 0) {
+    if (last_section_name != NULL) 
+      *last_section_name = NULL;
     return cur;
+  }
   // walk through path until last section
   for (int i = 0; i < sections_count - 1; i++) {
-    cur = get_next_dir(cur, path_array[i]);
+    cur = get_next_dir(cur, path_array[i], inodenum);
     if (cur == NULL)
       return NULL;
   }
@@ -87,21 +156,23 @@ struct ext2_inode *get_root_dir() {
   return get_inode(2);
 }
 
-// get next directory given it's name and inode of it's parent directory, return
-// null if doesn't exist
-struct ext2_inode *get_next_dir(struct ext2_inode *cur_dir, char *dir_name) {
+// get next directory given it's name and inode of it's parent directory, 
+// record inode number of next dir. Return null if doesn't exist
+struct ext2_inode *get_next_dir(struct ext2_inode *cur_dir, char *dir_name, int* inodenum) {
   // get inode with given name, check if it's a directory, return accordingly
-  struct ext2_inode *next_inode = get_next_inode(cur_dir, dir_name);
-  if (next_inode == NULL || get_type_inode(next_inode) != 'd')
+  struct ext2_inode *next_inode = get_next_inode(cur_dir, dir_name, inodenum);
+  if (next_inode == NULL || get_type_inode(next_inode) != EXT2_FT_DIR)
     return NULL;
   return next_inode;
 }
 
-// get next inode from given name and inode of it's parent directory, return
-// null if doesn't exist
-struct ext2_inode *get_next_inode(struct ext2_inode *cur_dir, char *name) {
+// get next inode from given name and inode of it's parent directory, 
+// record inode in a given int pointer. Return null if doesn't exist
+struct ext2_inode *get_next_inode(struct ext2_inode *cur_dir, char *name, int* inodenum) {
   struct ext2_dir_entry_2 *dir = get_next_dir_entry(cur_dir, name);
-  return dir == NULL ? NULL : get_inode(dir->inode);
+  if (dir == NULL) return NULL;
+  if (inodenum != NULL) *inodenum = dir->inode;
+  return get_inode(dir->inode);
 }
 
 // get directory entry given name and it's parent directory inode
@@ -129,18 +200,104 @@ struct ext2_dir_entry_2 *get_next_dir_entry(struct ext2_inode *cur_dir, char *na
 }
 
 // get type of inode
-char get_type_inode(struct ext2_inode *inode) {
-  return S_ISDIR(inode->i_mode) ? 'd' : (S_ISREG(inode->i_mode) ? 'f' : 's');
-}
-
-// get type of dir entry
-char get_type_dir_entry(struct ext2_dir_entry_2 *dir) {
-  return dir->file_type == EXT2_FT_REG_FILE ? 'f' : 
-                        (dir->file_type == EXT2_FT_DIR ? 'd' : 's');
+unsigned char get_type_inode(struct ext2_inode *inode) {
+  return S_ISDIR(inode->i_mode) ? EXT2_FT_DIR : 
+    (S_ISREG(inode->i_mode) ? EXT2_FT_REG_FILE : EXT2_FT_SYMLINK);
 }
 
 // get inode from inode number
 struct ext2_inode *get_inode(int inodenum) {
   return ((struct ext2_inode *)(disk + bgd->bg_inode_table * EXT2_BLOCK_SIZE)) +
          inodenum - 1;
+}
+
+unsigned char *get_block(int blocknum) {
+  return disk + (blocknum * EXT2_BLOCK_SIZE);
+}
+
+// round up real rec_len of directory entry to nearest multiple of 4
+int real_rec_len_round(int real_rec_len) {
+  int remainder = real_rec_len % 4;
+  return remainder == 0 ? real_rec_len : real_rec_len + 4 - remainder;
+}
+
+// find and set first low bit in bitmap to high, returns corresponding
+// index number of corresponding set bit
+int allocate_resource_on_bitmap(char *bm, int bitmap_size) {
+  int index = 0;
+  for (int i = 0; i < bitmap_size; i++) {
+    // get corresponding byte
+    unsigned cur_byte = bm[i / 8];
+    // if corresponding bit is 0, change it to 1, return index number
+    if (!((cur_byte & (1 << index)) > 0)) {
+      bm[i/8] = cur_byte | (1 << index);
+      return i;
+    } 
+    // increment shift index, if > 8 reset
+    if (++index == 8) index = 0;
+  }
+  // if there is no low bit, there is not enought memory -> exit
+  exit(ENOMEM);
+}
+
+// find unused inode, return it's number
+int allocate_inode(char file_type) {
+  // get the inode number (index + 1)
+  int index = allocate_resource_on_bitmap(get_inode_bitmap(), sb->s_inodes_count);
+  int inodenum = index + 1;
+  // get inode, reset all it's values and initialize new values (timefields not needed)
+  struct ext2_inode *inode = get_inode(inodenum);
+  memset(inode, 0, sizeof(struct ext2_inode));
+  inode->i_mode = get_inode_mode(file_type);
+  unsigned int now = (unsigned int) time(NULL);
+  inode->i_atime = now;
+  inode->i_ctime = now;
+  inode->i_mtime = now;
+  inode->i_links_count = 1; // directory creating this directory should have link to it
+  // decrement free inode count 
+  bgd->bg_free_inodes_count = bgd->bg_free_inodes_count - 1;
+  sb->s_free_inodes_count = sb->s_free_inodes_count - 1;
+  // return the inode number
+  return inodenum;
+}
+
+// find unused inode, return it's number
+int allocate_block() {
+  // get the block number (index)
+  int blocknum = allocate_resource_on_bitmap(get_block_bitmap(), sb->s_blocks_count);
+  // get block, reset all it's bits to 0
+  unsigned char *block = get_block(blocknum);
+  memset(block, 0, EXT2_BLOCK_SIZE);
+  // decrement free block count
+  bgd->bg_free_blocks_count = bgd->bg_free_blocks_count - 1;
+  sb->s_free_blocks_count = sb->s_free_blocks_count - 1;
+  // return the inode number
+  return blocknum;
+}
+
+// get the inode mode of given file type
+int get_inode_mode(char file_type) {
+  switch (file_type) {
+  case EXT2_FT_DIR:
+    return EXT2_S_IFDIR;
+  case EXT2_FT_REG_FILE:
+    return EXT2_S_IFREG;
+  default:
+    return EXT2_S_IFLNK;
+  }
+}
+
+// get block bitmap
+char *get_block_bitmap() {
+  return (char *) (disk + (bgd->bg_block_bitmap * EXT2_BLOCK_SIZE));
+}
+
+// get inode bitmap
+char *get_inode_bitmap() {
+  return (char *) (disk + (bgd->bg_inode_bitmap * EXT2_BLOCK_SIZE));
+}
+
+// calculate iblocks (in DISK SECTIONS - 512 bytes)
+unsigned int calculate_iblocks(unsigned int old_iblocks, int extra_bytes) {
+  return old_iblocks + (extra_bytes / 512);
 }
