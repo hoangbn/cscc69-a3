@@ -104,6 +104,7 @@ struct ext2_inode *path_walk(char *path, struct ext2_dir_entry_2 **dir_entry) {
   char *last_section_name;
   struct ext2_inode *second_last = path_walk_second_last(path, &last_section_name, NULL);
   if (second_last == NULL) return NULL;
+  if (last_section_name == NULL) return second_last;
   struct ext2_dir_entry_2 *last = get_next_dir_entry(second_last, last_section_name);
   if (dir_entry != NULL) *dir_entry = last;
   return last == NULL ? NULL : get_inode(last->inode);
@@ -122,8 +123,7 @@ struct ext2_inode *path_walk_second_last(char *path, char** last_section_name, i
   // get the root directory
   struct ext2_inode *cur = get_root_dir();
   if (sections_count == 0) {
-    if (last_section_name != NULL) 
-      *last_section_name = NULL;
+    if (last_section_name != NULL) *last_section_name = NULL;
     return cur;
   }
   // walk through path until last section
@@ -132,8 +132,10 @@ struct ext2_inode *path_walk_second_last(char *path, char** last_section_name, i
     if (cur == NULL)
       return NULL;
   }
+  // assign last section name, and inodenumber for case we're in root dir
   if (last_section_name != NULL) 
     *last_section_name = path_array[sections_count - 1];
+  if (inodenum != NULL && sections_count == 1) *inodenum = 2;
   return cur;
 }
 
