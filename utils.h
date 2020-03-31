@@ -23,8 +23,8 @@ void path_as_array(char *path, char **path_array, int *sections_count);
 int real_rec_len_round(int real_rec_len);
 int get_inode_mode(char file_type);
 int allocate_inode(char file_type);
-void init_entry_values(struct ext2_dir_entry_2 *entry, unsigned int inodenum,
-      unsigned short rec_len, unsigned char name_len, unsigned char file_type, char *name);
+void init_entry_values(struct ext2_dir_entry_2 *entry, unsigned int inodenum, unsigned short rec_len,
+                        unsigned char name_len, unsigned char file_type, char *name);
 int allocate_block();
 int get_inode_mode(char file_type);
 char *get_block_bitmap();

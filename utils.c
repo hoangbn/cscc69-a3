@@ -191,7 +191,7 @@ struct ext2_dir_entry_2 *create_dir_entry(struct ext2_inode *parent_inode,
   int blocknum = allocate_block();
   // update inode after allocating
   *arr = blocknum;
-  parent_inode->i_size = parent_inode->i_size + 1;
+  parent_inode->i_size = parent_inode->i_size + EXT2_BLOCK_SIZE;
   parent_inode->i_blocks = calculate_iblocks(parent_inode->i_blocks, EXT2_BLOCK_SIZE);
   // get the block and create new entry (offset 0)
   unsigned long new_block_pos = (unsigned long)disk + blocknum * EXT2_BLOCK_SIZE;
@@ -201,13 +201,16 @@ struct ext2_dir_entry_2 *create_dir_entry(struct ext2_inode *parent_inode,
 }
 
 // initialize directory entry values
-void init_entry_values(struct ext2_dir_entry_2 *entry, unsigned int inodenum,
-      unsigned short rec_len, unsigned char name_len, unsigned char file_type, char *name) {
+void init_entry_values(struct ext2_dir_entry_2 *entry, unsigned int inodenum, unsigned short rec_len,
+                        unsigned char name_len, unsigned char file_type, char *name) {
+  // initializing entry values
   entry->inode = inodenum;
   entry->rec_len = rec_len;
   entry->name_len = name_len;
   entry->file_type= file_type;
   strncpy(entry->name, name, name_len);
+  // updating link count of inode that this entry links to
+  get_inode(inodenum)->i_links_count++;
 }
 
 // get inode at given path(can be a directory or a file), and corresponding
@@ -360,6 +363,7 @@ int allocate_inode(char file_type) {
   int index = allocate_resource_on_bitmap(get_inode_bitmap(), sb->s_inodes_count);
   int inodenum = index + 1;
   // get inode, reset all it's values and initialize new values (timefields not needed)
+  // note, direcotry link is not done here (is in init_entry_values instead)
   struct ext2_inode *inode = get_inode(inodenum);
   memset(inode, 0, sizeof(struct ext2_inode));
   inode->i_mode = get_inode_mode(file_type);
@@ -367,10 +371,9 @@ int allocate_inode(char file_type) {
   inode->i_atime = now;
   inode->i_ctime = now;
   inode->i_mtime = now;
-  inode->i_links_count = 1; // directory creating this directory should have link to it
   // decrement free inode count 
-  bgd->bg_free_inodes_count = bgd->bg_free_inodes_count - 1;
-  sb->s_free_inodes_count = sb->s_free_inodes_count - 1;
+  bgd->bg_free_inodes_count--;
+  sb->s_free_inodes_count--;
   // return the inode number
   return inodenum;
 }
@@ -383,8 +386,8 @@ int allocate_block() {
   unsigned char *block = get_block(blocknum);
   memset(block, 0, EXT2_BLOCK_SIZE);
   // decrement free block count
-  bgd->bg_free_blocks_count = bgd->bg_free_blocks_count - 1;
-  sb->s_free_blocks_count = sb->s_free_blocks_count - 1;
+  bgd->bg_free_blocks_count--;
+  sb->s_free_blocks_count--;
   // return the inode number
   return blocknum;
 }

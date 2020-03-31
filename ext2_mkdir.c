@@ -15,6 +15,7 @@ int main(int argc, char **argv) {
   }
   // load disk and perform path walk to second to last directory
   loaddisk(argv[1]);
+  print_disk_image(); // TODO: remove
   char* last_section_name;
   int second_last_inodenum;
   struct ext2_inode *second_last = path_walk_second_last(argv[2],
@@ -38,5 +39,6 @@ int main(int argc, char **argv) {
   create_dir_entry(new_dir_inode, ".", EXT2_FT_DIR, new_dir_entry->inode);
   create_dir_entry(new_dir_inode, "..", EXT2_FT_DIR, second_last_inodenum);
 
+  print_disk_image(); // TODO: remove
   return 0;
 }
