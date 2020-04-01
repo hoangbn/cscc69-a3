@@ -122,7 +122,7 @@ void print_disk_image() {
     // Get the block number
     int blocknum = dirs[i];
     // Get the position in bytes and index to block
-    unsigned long pos = (unsigned long) disk + blocknum * EXT2_BLOCK_SIZE;
+    unsigned long pos = get_block_pos(blocknum);
     struct ext2_dir_entry_2 *dir = (struct ext2_dir_entry_2 *) pos;
 
     printf("    DIR BLOCK NUM: %d (for inode %d)\n", blocknum, dir->inode);
@@ -150,7 +150,10 @@ void print_disk_image() {
 struct ext2_dir_entry_2 *create_dir_entry(struct ext2_inode *parent_inode,
                        char* name, char file_type, unsigned int inodenum) {
   // check if there already exists an entry with given name
-  if (get_next_dir_entry(parent_inode, name) != NULL) exit(EEXIST);
+  if (get_next_dir_entry(parent_inode, name) != NULL) {
+    printf("Already exists\n");
+    exit(EEXIST);
+  }
   // get inode number to set for new entry
   unsigned int entry_inode = inodenum == 0 ? allocate_inode(file_type) : inodenum;
   int dir_entry_size = sizeof(struct ext2_dir_entry_2);
@@ -162,7 +165,7 @@ struct ext2_dir_entry_2 *create_dir_entry(struct ext2_inode *parent_inode,
   unsigned int *arr = parent_inode->i_block;
   while (*arr != 0) {
     // get starting position in the block;
-    unsigned long pos = (unsigned long)disk + *arr * EXT2_BLOCK_SIZE;
+    unsigned long pos = get_block_pos(*arr);
     struct ext2_dir_entry_2 *dir = (struct ext2_dir_entry_2 *)pos;
     // loop till the end of the block, checking if there is space for new entry
     do {
@@ -196,7 +199,7 @@ struct ext2_dir_entry_2 *create_dir_entry(struct ext2_inode *parent_inode,
   parent_inode->i_size = parent_inode->i_size + EXT2_BLOCK_SIZE;
   parent_inode->i_blocks = calculate_iblocks(parent_inode->i_blocks, EXT2_BLOCK_SIZE);
   // get the block and create new entry (offset 0)
-  unsigned long new_block_pos = (unsigned long)disk + blocknum * EXT2_BLOCK_SIZE;
+  unsigned long new_block_pos = get_block_pos(blocknum);
   struct ext2_dir_entry_2 *new_entry = (struct ext2_dir_entry_2 *) new_block_pos;
   init_entry_values(new_entry, entry_inode, EXT2_BLOCK_SIZE, name_len, file_type, name);
   return new_entry;
@@ -301,7 +304,7 @@ struct ext2_dir_entry_2 *get_next_dir_entry(struct ext2_inode *cur_dir, char *na
   unsigned int *arr = cur_dir->i_block;
   while (*arr != 0) {
     // get starting position in the block;
-    unsigned long pos = (unsigned long)disk + *arr * EXT2_BLOCK_SIZE;
+    unsigned long pos = get_block_pos(*arr);
     struct ext2_dir_entry_2 *dir = (struct ext2_dir_entry_2 *)pos;
     // loop till the end of the block
     do {
@@ -330,8 +333,14 @@ struct ext2_inode *get_inode(int inodenum) {
          inodenum - 1;
 }
 
+// get the block with given block number
 unsigned char *get_block(int blocknum) {
   return disk + (blocknum * EXT2_BLOCK_SIZE);
+}
+
+// get the starting positiong of the block
+unsigned long get_block_pos(int blocknum) {
+  return (unsigned long)disk + blocknum * EXT2_BLOCK_SIZE;
 }
 
 // round up real rec_len of directory entry to nearest multiple of 4

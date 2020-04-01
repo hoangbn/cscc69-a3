@@ -20,7 +20,7 @@ int main(int argc, char **argv) {
   int second_last_inodenum;
   struct ext2_inode *second_last = path_walk_second_last(argv[2],
                                     &last_section_name, &second_last_inodenum);
-  // check type of inode, and print accordingly
+  // validate if given path was valid
   if (second_last == NULL) {
     printf("No such file or directory\n");
     return ENOENT;
@@ -34,7 +34,7 @@ int main(int argc, char **argv) {
             second_last, last_section_name, EXT2_FT_DIR, 0);
   struct ext2_inode *new_dir_inode = get_inode(new_dir_entry->inode);
   // update count of directories
-  bgd->bg_used_dirs_count = bgd->bg_used_dirs_count + 1;
+  bgd->bg_used_dirs_count++;
   // create new entries for this new directory (. and ..)
   create_dir_entry(new_dir_inode, ".", EXT2_FT_DIR, new_dir_entry->inode);
   create_dir_entry(new_dir_inode, "..", EXT2_FT_DIR, second_last_inodenum);

@@ -7,3 +7,4 @@ ext2_mkdir
 ext2_ln
 ext2_rm
 script.sh
+images/

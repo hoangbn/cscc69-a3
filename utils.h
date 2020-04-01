@@ -17,6 +17,7 @@ extern struct ext2_dir_entry_2 *get_next_dir_entry(struct ext2_inode *cur_dir, c
 extern unsigned char get_type_inode(struct ext2_inode *inode);
 extern struct ext2_inode *get_inode(int inodenum);
 extern unsigned char *get_block(int blocknum);
+extern unsigned long get_block_pos(int blocknum);
 
 // local helper function
 void path_as_array(char *path, char **path_array, int *sections_count);
