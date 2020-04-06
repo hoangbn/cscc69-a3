@@ -69,7 +69,23 @@ int main(int argc, char **argv) {
     struct ext2_dir_entry_2 *new_dir_entry = create_dir_entry(
               second_last, dest_filename, EXT2_FT_SYMLINK, 0);
 
-    // TODO: Data block for new inode should contain the path to the original file (target)
+    // Data block for new inode should contain the path to the original file (target)
+    struct ext2_inode *new_inode = get_inode(new_dir_entry->inode);
+
+    // Allocate block, update inode block information
+    int blocknum = allocate_block();
+    unsigned char* block = get_block(blocknum);
+
+    // Length of path to original target file (also, size of symlink)
+    unsigned int target_path_len = strlen(target);
+
+    new_inode->i_block[0] = blocknum;
+    new_inode->i_blocks = calculate_iblocks(new_inode->i_blocks, EXT2_BLOCK_SIZE);
+    new_inode->i_size = target_path_len;
+
+    // Copy the target path into the block
+    memcpy(block, target, target_path_len);
   }
 
+  return 0;
 }
