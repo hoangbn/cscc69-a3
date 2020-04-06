@@ -6,6 +6,8 @@ extern void print_inode(struct ext2_inode *inode);
 extern void print_disk_image();
 
 // utils
+extern void unlink_inode(unsigned int inodenum);
+extern void remove_dir_entry(struct ext2_inode *parent_inode, char* name);
 extern struct ext2_dir_entry_2 *create_dir_entry(struct ext2_inode *parent_inode,
                        char* name, char file_type, unsigned int inodenum);
 extern struct ext2_inode *path_walk(char *path, struct ext2_dir_entry_2 **dir_entry);
@@ -31,6 +33,7 @@ int get_inode_mode(char file_type);
 char *get_block_bitmap();
 char *get_inode_bitmap();
 unsigned int calculate_iblocks(unsigned int old_iblocks, int extra_bytes);
-
+void free_block(unsigned int blocknum);
+void free_inode(unsigned int inodenum);
 
 #endif

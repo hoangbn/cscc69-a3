@@ -145,6 +145,50 @@ void print_disk_image() {
   }
 }
 
+// decrements link count, and frees data blocks if needed
+void unlink_inode(unsigned int inodenum) {
+  struct ext2_inode *inode = get_inode(inodenum);
+  inode->i_links_count--;
+  if (inode->i_links_count <= 0) {
+    inode->i_dtime = (unsigned int) time(NULL);
+    free_inode(inodenum);
+  }
+}
+
+// remove the directory entry with given name
+void remove_dir_entry(struct ext2_inode *parent_inode, char* name) {
+   int name_len = strlen(name);
+  // Get the array of blocks from inode
+  unsigned int *arr = parent_inode->i_block;
+  while (*arr != 0) {
+    // get starting position in the block;
+    unsigned long pos = get_block_pos(*arr);
+    // keep a pointer to previous entry, and current
+    struct ext2_dir_entry_2 *prev_entry = NULL;
+    struct ext2_dir_entry_2 *cur_entry = (struct ext2_dir_entry_2 *)pos;
+    // loop till the end of the block
+    do {
+      // if given name match current inode name, return current inode
+      if (name_len == cur_entry->name_len && 
+          strncmp(cur_entry->name, name, cur_entry->name_len) == 0) {
+        // set inode # to 0 and make previous directory skip it
+        // NOTE: assuming prev is not NULL here, because we don't
+        // have to worry about that case
+        cur_entry->inode = 0;
+        prev_entry->rec_len += cur_entry->rec_len;
+        return;
+      }
+      // advance to the next inode  
+      prev_entry = cur_entry;
+      pos += cur_entry->rec_len;
+      cur_entry = (struct ext2_dir_entry_2 *)pos;
+    } while (pos % EXT2_BLOCK_SIZE != 0);
+    // advance to the next block in array
+    arr++;
+  }
+  printf("No such file or directory\n");
+  exit(ENOENT);
+}
 // attempts to create a new directory entry with given name and file type, sets inode
 // of new entry to given inode number. If given inode number is 0, allocates a new inode
 struct ext2_dir_entry_2 *create_dir_entry(struct ext2_inode *parent_inode,
@@ -359,7 +403,7 @@ int allocate_resource_on_bitmap(char *bm, int bitmap_size) {
     // if corresponding bit is 0, change it to 1, return index number
     if (!((cur_byte & (1 << index)) > 0)) {
       bm[i/8] = cur_byte | (1 << index);
-      return i;
+      return i + 1;
     } 
     // increment shift index, if > 8 reset
     if (++index == 8) index = 0;
@@ -371,8 +415,7 @@ int allocate_resource_on_bitmap(char *bm, int bitmap_size) {
 // find unused inode, return it's number
 int allocate_inode(char file_type) {
   // get the inode number (index + 1)
-  int index = allocate_resource_on_bitmap(get_inode_bitmap(), sb->s_inodes_count);
-  int inodenum = index + 1;
+  int inodenum = allocate_resource_on_bitmap(get_inode_bitmap(), sb->s_inodes_count);
   // get inode, reset all it's values and initialize new values (timefields not needed)
   // note, direcotry link is not done here (is in init_entry_values instead)
   struct ext2_inode *inode = get_inode(inodenum);
@@ -401,6 +444,51 @@ int allocate_block() {
   sb->s_free_blocks_count--;
   // return the inode number
   return blocknum;
+}
+
+// unset the bit on bitmap that corresponds to given index
+void free_resource_on_bitmap(char *bm, int num) {
+  int index = num - 1;
+  unsigned byte_index = index / 8;
+  unsigned offset = index % 8;
+  // set corresponding bit to 0
+  bm[byte_index] = bm[byte_index] & ~(1 << offset);
+}
+
+// free a block with given blocknumber
+void free_block(unsigned int blocknum) {
+  free_resource_on_bitmap(get_block_bitmap(), blocknum);
+  bgd->bg_free_blocks_count++;
+  sb->s_free_blocks_count++;
+}
+
+// free a inode with given inode number (frees all the blocks inode is using too)
+void free_inode(unsigned int inodenum) {
+  free_resource_on_bitmap(get_inode_bitmap(), inodenum);
+  bgd->bg_free_inodes_count++;
+  sb->s_free_inodes_count++;
+  struct ext2_inode *inode = get_inode(inodenum);
+  // free first 12 blocks
+  unsigned int *arr = inode->i_block;
+  int block_ptr_index = 0;
+  while (block_ptr_index < 12 && arr[block_ptr_index] != 0) {
+    free_block(arr[block_ptr_index]);
+    block_ptr_index++;
+  }
+  // free indirect block if needed
+  unsigned int indirect_blocknum = arr[block_ptr_index];
+  if (indirect_blocknum == 0) return;
+  unsigned int *indirect_block = (unsigned int *) get_block(indirect_blocknum);
+  int max_indirect_blocks = EXT2_BLOCK_SIZE / sizeof(unsigned int);
+  int num_indirect_blocks = 0;
+  // free all blocks that indirect block points to
+  while (*indirect_block != 0 && num_indirect_blocks < max_indirect_blocks) {
+    free_block(*indirect_block);
+    indirect_block++;
+    num_indirect_blocks++;
+  }
+  // free the indirect block
+  free_block(indirect_blocknum);
 }
 
 // get the inode mode of given file type

@@ -114,4 +114,3 @@ int main(int argc, char **argv) {
   print_disk_image(); // TODO: remove
   return 0;
 }
-
