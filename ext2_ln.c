@@ -4,13 +4,13 @@
 #include <sys/mman.h>
 #include <errno.h>
 #include <string.h>
+#include <libgen.h>
 #include "diskload.h"
 #include "ext2.h"
 #include "utils.h"
 
 
 int main(int argc, char **argv) {
-  // 
   if (argc < 4 || argc > 5) {
     fprintf(stderr, "Usage: ./ext2_ln <image file path> [-s] <absolute target path> <absolute destination path>\n");
     exit(1);
@@ -29,15 +29,15 @@ int main(int argc, char **argv) {
     target_ft = EXT2_FT_REG_FILE;
   }
   else {
-      // If there are 5 args given, the second arg should be "-s"
-      if (argv[2] != "-s") {
-          fprintf(stderr, "Usage: ./ext2_ln <image file path> [-s] <absolute target path> <absolute destination path>\n");
-          exit(1);
-      }
-      target = argv[3];
-      dest = argv[4];
-      target_ft = EXT2_FT_SYMLINK;
-  }
+    // If there are 5 args given, the second arg should be "-s"
+    if (strcmp(argv[2], "-s") != 0) {
+        fprintf(stderr, "Usage: ./ext2_ln <image file path> [-s] <absolute target path> <absolute destination path>\n");
+        exit(1);
+    }
+    target = argv[3];
+    dest = argv[4];
+    target_ft = EXT2_FT_SYMLINK;
+}
 
   char *dest_filename = basename(dest);
 
@@ -61,8 +61,7 @@ int main(int argc, char **argv) {
   // Create hard link
   if (target_ft == EXT2_FT_REG_FILE) {
     // Create new directory entry pointing to original target's inode (target_dir_entry->inode)
-    struct ext2_dir_entry_2 *new_dir_entry = create_dir_entry(
-              second_last, dest_filename, EXT2_FT_REG_FILE, target_dir_entry->inode);
+    create_dir_entry(second_last, dest_filename, EXT2_FT_REG_FILE, target_dir_entry->inode);
   }
   // Create symbolic link
   else {
