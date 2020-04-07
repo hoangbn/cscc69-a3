@@ -6,5 +6,6 @@ ext2_cp
 ext2_mkdir
 ext2_ln
 ext2_rm
+ext2_rm_bonus
 script.sh
 images/

@@ -155,9 +155,34 @@ void unlink_inode(unsigned int inodenum) {
   }
 }
 
-// remove the directory entry with given name
+// remove directory (recursively)
+void remove_directory(struct ext2_inode *parent_inode) {
+  unsigned int *arr = parent_inode->i_block;
+  while (*arr != 0) {
+    // get starting position in the block;
+    unsigned long pos = get_block_pos(*arr);
+    struct ext2_dir_entry_2 *dir = (struct ext2_dir_entry_2 *)pos;
+    // loop till the end of the block
+    do {
+      // if it's a directory, recursively remove everything in that directory
+      if (dir->file_type == EXT2_FT_DIR && !is_cur_or_prev(dir->name, dir->name_len)) {
+        remove_directory(get_inode(dir->inode));
+      }
+      unlink_inode(dir->inode);
+      // advance to the next inode  
+      pos += dir->rec_len;
+      dir = (struct ext2_dir_entry_2 *)pos;
+    } while (pos % EXT2_BLOCK_SIZE != 0);
+    // advance to the next block in array
+    arr++;
+  }
+  bgd->bg_used_dirs_count--;
+}
+
+// remove the directory entry with given name, unlinks the inode
+// potentially removing it's contents if nothing links to it anymore
 void remove_dir_entry(struct ext2_inode *parent_inode, char* name) {
-   int name_len = strlen(name);
+  int name_len = strlen(name);
   // Get the array of blocks from inode
   unsigned int *arr = parent_inode->i_block;
   while (*arr != 0) {
@@ -175,7 +200,8 @@ void remove_dir_entry(struct ext2_inode *parent_inode, char* name) {
         // NOTE: assuming prev is not NULL here, because we don't
         // have to worry about that case
         cur_entry->inode = 0;
-        prev_entry->rec_len += cur_entry->rec_len;
+        if (prev_entry != NULL)
+          prev_entry->rec_len += cur_entry->rec_len;
         return;
       }
       // advance to the next inode  
@@ -516,4 +542,9 @@ char *get_inode_bitmap() {
 // calculate iblocks (in DISK SECTIONS - 512 bytes)
 unsigned int calculate_iblocks(unsigned int old_iblocks, int extra_bytes) {
   return old_iblocks + (extra_bytes / 512);
+}
+
+int is_cur_or_prev (char* name, int name_len) {
+  return ((name_len == 1 && strncmp(".", name, 1) == 0)) || 
+            ((name_len == 2 && strncmp("..", name, 2) == 0));
 }

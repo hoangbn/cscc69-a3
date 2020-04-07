@@ -6,6 +6,7 @@ extern void print_inode(struct ext2_inode *inode);
 extern void print_disk_image();
 
 // utils
+extern void remove_directory(struct ext2_inode *parent_inode);
 extern void unlink_inode(unsigned int inodenum);
 extern void remove_dir_entry(struct ext2_inode *parent_inode, char* name);
 extern struct ext2_dir_entry_2 *create_dir_entry(struct ext2_inode *parent_inode,
@@ -20,6 +21,7 @@ extern unsigned char get_type_inode(struct ext2_inode *inode);
 extern struct ext2_inode *get_inode(int inodenum);
 extern unsigned char *get_block(int blocknum);
 extern unsigned long get_block_pos(int blocknum);
+extern int is_cur_or_prev (char* name, int name_len);
 
 // local helper function
 void path_as_array(char *path, char **path_array, int *sections_count);

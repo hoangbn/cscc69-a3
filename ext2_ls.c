@@ -8,12 +8,6 @@
 #include "ext2.h"
 #include "utils.h"
 
-// checks if given name is either . or .. (1 if true 0 if false)
-int is_cur_or_prev (char* name, int name_len) {
-  return ((name_len == 1 && strncmp(".", name, 1) == 0)) || 
-            ((name_len == 2 && strncmp("..", name, 2) == 0));
-}
-
 int main(int argc, char **argv) {
   if (argc < 3) {
     fprintf(stderr, "Usage: ./ext2_ls <image file path> [-a] <absolute path to list>\n");
