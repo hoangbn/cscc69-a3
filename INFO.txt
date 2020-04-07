@@ -1,0 +1,7 @@
+Minh Hoang Nguyen - nguy1924
+Nhi Nguyen - nguy1916
+Richard Gao - gaorich4
+
+Everything is implemented including bonus. Some of the edge cases were not covered (after asking TAs) such as:
+- Removing a directory entry that starts at the very beginning
+- Removing a root directory recursively
