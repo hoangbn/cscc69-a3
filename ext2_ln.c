@@ -16,8 +16,6 @@ int main(int argc, char **argv) {
     exit(1);
   }
   loaddisk(argv[1]);
-  print_disk_image(); // TODO: remove
-
   char *target;
   char *dest;
   unsigned char target_ft;
@@ -105,6 +103,5 @@ int main(int argc, char **argv) {
     // Copy the target path into the block
     memcpy(block, target, target_path_len);
   }
-  print_disk_image(); // TODO: remove
   return 0;
 }

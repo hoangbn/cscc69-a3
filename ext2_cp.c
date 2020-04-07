@@ -19,7 +19,6 @@ int main(int argc, char **argv) {
   }
   //load disk and get the arg for sourse and destination
   loaddisk(argv[1]);
-  print_disk_image(); // TODO: remove
   char *source_path = argv[2];
   char *des_path = argv[3];
   //check for valid source file
@@ -81,10 +80,8 @@ int main(int argc, char **argv) {
       new_inode->i_mtime = now;
   }
   // if we read all data, return
-  if ((bytes_read = fread(buf, 1, EXT2_BLOCK_SIZE, source_file)) <= 0) {
-    print_disk_image(); // TODO: remove
+  if ((bytes_read = fread(buf, 1, EXT2_BLOCK_SIZE, source_file)) <= 0)
     return 0;
-  }
   // else, need to allocate a single indirect block for more data
   // Note: by assignment description, we asssume files need only a single indirection
   unsigned int blocknum_indirect = allocate_block();
@@ -110,7 +107,5 @@ int main(int argc, char **argv) {
       indirect_block++;
   } while (num_indirect_blocks < max_indirect_blocks &&
             (bytes_read = fread(buf, 1, EXT2_BLOCK_SIZE, source_file)) > 0);
-
-  print_disk_image(); // TODO: remove
   return 0;
 }

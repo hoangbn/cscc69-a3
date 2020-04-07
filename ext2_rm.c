@@ -19,7 +19,6 @@ int main(int argc, char **argv) {
   }
   //load disk and get the arg for sourse and destination
   loaddisk(argv[1]);
-  print_disk_image(); // TODO: remove
   char *rm_path = argv[2];
   //check if file to rm exists
   char *rm_file_name;
@@ -50,6 +49,5 @@ int main(int argc, char **argv) {
   remove_dir_entry(second_last_dir, rm_file_name);
   // unlink, free the inode, free it's blocks if it has no more links
   unlink_inode(rm_inodenum);
-  print_disk_image(); // TODO: remove
   return 0;
 }

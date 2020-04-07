@@ -20,7 +20,6 @@ int main(int argc, char **argv) {
   }
   //load disk and get the arg for sourse and destination
   loaddisk(argv[1]);
-  print_disk_image(); // TODO: remove
   char *rm_path = argv[2];
   int recursive = 0;
   if (strcmp(argv[2], "-r") == 0) {
@@ -62,6 +61,5 @@ int main(int argc, char **argv) {
     remove_directory(rm_inode);
   }
   unlink_inode(rm_inodenum);
-  print_disk_image(); // TODO: remove
   return 0;
 }
