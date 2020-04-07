@@ -43,8 +43,10 @@ int main(int argc, char **argv) {
   char *orig_filename = basename(target);
   // Check that given target file is valid and not a directory
   if (target_inode == NULL) {
+    printf("No such file or directory\n");
     return ENOENT;
   } else if (get_type_inode(target_inode) == EXT2_FT_DIR) {
+    printf("Target must be a file\n");
     return EISDIR;
   }
 
